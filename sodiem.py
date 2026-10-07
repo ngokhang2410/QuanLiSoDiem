@@ -1,6 +1,7 @@
-from flask import Flask, request, abort, url_for, render_template_string
+from flask import Flask, request, abort, url_for, render_template_string, make_response
 import html
-
+import io
+import csv
 app = Flask(__name__)
 
 STUDENTS = {
@@ -63,7 +64,20 @@ def home():
 
 @app.route("/students")
 def get_students():
+    export = request.args.get("export")
     summaries = [student_summary(m) for m in STUDENTS.keys()]
+    if export == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Mã SV", "Họ tên", "Lớp", "Điểm TB", "Xếp loại"])
+        for s in summaries:
+            avg_str = s["average"] if s["average"] is not None else ""
+            writer.writerow([s["mssv"], s["name"], s["lop"], avg_str, s["rank"]])
+        
+        response = make_response(output.getvalue())
+        response.headers["Content-Disposition"] = "attachment; filename=danh_sach_sinh_vien.csv"
+        response.headers["Content-type"] = "text/csv; charset=utf-8-sig"
+        return response
     rows = ""
     for s in summaries:
         avg = s["average"] if s["average"] is not None else "N/A"
@@ -72,7 +86,10 @@ def get_students():
             <td>{avg}</td><td><span class="badge bg-primary">{s['rank']}</span></td>
             <td><a href="{url_for('get_student_detail', mssv=s['mssv'])}" class="btn btn-sm btn-info text-white">Xem</a></td>
         </tr>"""
-    body = f"""<h3>Danh Sách Sinh Viên</h3>
+    body = f"""<div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Danh Sách Sinh Viên</h3>
+        <a href="{url_for('get_students')}?export=csv" class="btn btn-success">Xuất CSV</a>
+    </div>
     <table class="table table-striped">
         <thead><tr><th>Mã SV</th><th>Họ tên</th><th>Lớp</th><th>ĐTB</th><th>Xếp loại</th><th>Thao tác</th></tr></thead>
         <tbody>{rows}</tbody>
